@@ -1,0 +1,25 @@
+name: pr_opened
+trigger: github.pull_request.opened
+description: Summarize new PRs and post to Slack
+
+actions:
+  - tool: github.summarize_pr
+    args:
+      repo: "{{ repo }}"
+      pr_number: "{{ pr_number }}"
+    description: Summarize the pull request
+    on_failure: stop
+
+  - tool: slack.send_message
+    args:
+      channel: "#dev-notifications"
+      text: "New PR opened: {{ title }} — {{ url }}"
+    description: Notify Slack channel
+    on_failure: continue
+
+  - tool: jira.link_github_issue
+    args:
+      ticket_key: "{{ jira_ticket }}"
+      github_url: "{{ url }}"
+    description: Link PR to Jira ticket
+    on_failure: continue

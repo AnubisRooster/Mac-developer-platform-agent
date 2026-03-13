@@ -1,0 +1,32 @@
+agent:
+  name: claw-agent
+  version: 0.2.0
+  log_level: INFO
+  log_file: logs/agent.log
+
+ironclaw:
+  url: ${IRONCLAW_URL:-http://localhost:9090}
+
+server:
+  host: ${WEBHOOK_HOST:-0.0.0.0}
+  port: ${WEBHOOK_PORT:-8080}
+
+database:
+  url: ${DATABASE_URL:-postgresql://claw:claw@localhost:5432/clawagent}
+
+integrations:
+  slack:
+    enabled: true
+  github:
+    enabled: true
+  jira:
+    enabled: true
+  confluence:
+    enabled: true
+  jenkins:
+    enabled: true
+  gmail:
+    enabled: true
+
+workflows:
+  directory: workflows

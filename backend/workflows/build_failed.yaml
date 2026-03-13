@@ -1,0 +1,24 @@
+name: build_failed
+trigger: jenkins.build.failed
+description: Fetch logs, summarize failure, and alert Slack
+
+actions:
+  - tool: jenkins.fetch_logs
+    args:
+      job_name: "{{ job_name }}"
+      build_number: "{{ build_number }}"
+    description: Fetch build logs
+    on_failure: stop
+
+  - tool: agent.summarize
+    args:
+      instruction: "Summarize the build failure and suggest a fix."
+    description: Summarize failure with IronClaw
+    on_failure: stop
+
+  - tool: slack.send_message
+    args:
+      channel: "#build-alerts"
+      text: "Build failed: {{ job_name }} #{{ build_number }}\n\n{{ summary }}"
+    description: Post failure summary to Slack
+    on_failure: continue

@@ -1,0 +1,26 @@
+name: jira_created
+trigger: jira.issue.created
+description: Create a GitHub issue and notify Slack when a Jira ticket is created
+
+actions:
+  - tool: github.create_issue
+    args:
+      repo: "{{ repo }}"
+      title: "{{ summary }}"
+      body: "Jira ticket: {{ key }}\n\n{{ description }}"
+    description: Mirror Jira ticket as GitHub issue
+    on_failure: stop
+
+  - tool: slack.send_message
+    args:
+      channel: "#dev-team"
+      text: "New Jira ticket created: {{ key }} — {{ summary }}"
+    description: Notify Slack
+    on_failure: continue
+
+  - tool: jira.update_ticket
+    args:
+      ticket_key: "{{ key }}"
+      labels: ["synced-to-github"]
+    description: Tag Jira ticket as synced
+    on_failure: continue
