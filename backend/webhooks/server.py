@@ -28,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database.models import (
     AgentConversation,
+    AgentLog,
     Event as EventRow,
     WorkflowRun,
     get_session,
@@ -93,6 +94,7 @@ async def github_webhook(
         event_type=event_type, source=EventSource.GITHUB, payload=payload
     )
     logger.info("Received GitHub webhook: %s", event_type)
+    _persist_log("INFO", "webhook.github", f"Received: {event_type}", json.dumps({"action": action, "event": x_github_event}))
     await event_bus.publish(event)
     return {"accepted": True, "event_type": event_type}
 
@@ -114,6 +116,7 @@ async def jira_webhook(request: Request):
         event_type=event_type, source=EventSource.JIRA, payload=payload
     )
     logger.info("Received Jira webhook: %s", event_type)
+    _persist_log("INFO", "webhook.jira", f"Received: {event_type}", "")
     await event_bus.publish(event)
     return {"accepted": True, "event_type": event_type}
 
@@ -141,6 +144,7 @@ async def jenkins_webhook(request: Request):
         payload={**payload, "job_name": job_name},
     )
     logger.info("Received Jenkins webhook: %s", event_type)
+    _persist_log("INFO", "webhook.jenkins", f"Received: {event_type}", "")
     await event_bus.publish(event)
     return {"accepted": True, "event_type": event_type}
 
@@ -171,6 +175,7 @@ async def slack_webhook(request: Request):
         event_type=event_type, source=EventSource.SLACK, payload=payload
     )
     logger.info("Received Slack webhook: %s", event_type)
+    _persist_log("INFO", "webhook.slack", f"Received: {event_type}", "")
     await event_bus.publish(event)
 
     # Route @claw commands through the Slack command gateway
@@ -340,3 +345,154 @@ async def api_agent_conversations(
         return {"conversations": conversations, "total": total}
     finally:
         session.close()
+
+
+# ─── Model Configuration API ────────────────────────────────────────────────
+
+
+@app.get("/api/model-config")
+async def api_model_config():
+    """Return the current model configuration and available models."""
+    from agent.ironclaw import OLLAMA_MODELS, OPENROUTER_MODELS
+
+    config: Dict[str, Any] = {
+        "current_provider": "ollama",
+        "current_model": "unknown",
+        "ollama_models": OLLAMA_MODELS,
+        "openrouter_models": OPENROUTER_MODELS,
+        "openrouter_configured": False,
+    }
+    secrets = get_secrets()
+    config["openrouter_configured"] = bool(secrets.openrouter_api_key)
+
+    if hasattr(app.state, "orchestrator"):
+        ic = app.state.orchestrator.ironclaw
+        config["current_provider"] = ic.current_provider
+        config["current_model"] = ic.current_model
+    return config
+
+
+@app.post("/api/model-config")
+async def set_model_config(request: Request):
+    """Switch the active model and provider at runtime."""
+    body = await request.json()
+    model = body.get("model", "")
+    provider = body.get("provider", "ollama")
+
+    if not model:
+        raise HTTPException(status_code=400, detail="model is required")
+    if provider not in ("ollama", "openrouter"):
+        raise HTTPException(status_code=400, detail="provider must be 'ollama' or 'openrouter'")
+
+    if provider == "openrouter":
+        secrets = get_secrets()
+        if not secrets.openrouter_api_key:
+            raise HTTPException(
+                status_code=400,
+                detail="OpenRouter API key not configured. Set OPENROUTER_API_KEY in .env",
+            )
+
+    if not hasattr(app.state, "orchestrator"):
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized")
+
+    ic = app.state.orchestrator.ironclaw
+
+    test_result = await ic.test_model(model, provider)
+    if not test_result.get("ok"):
+        _persist_log("WARN", "model-config", f"Model test failed for {provider}/{model}", test_result.get("error", ""))
+        raise HTTPException(
+            status_code=422,
+            detail=f"Model unavailable: {test_result.get('error', 'unknown error')}",
+        )
+
+    result = ic.set_model(model, provider)
+    _persist_log("INFO", "model-config", f"Model switched to {provider}/{model}", "")
+    return {"ok": True, **result}
+
+
+@app.post("/api/model-config/test")
+async def test_model(request: Request):
+    """Test if a specific model is reachable without switching."""
+    body = await request.json()
+    model = body.get("model", "")
+    provider = body.get("provider", "ollama")
+
+    if not model:
+        raise HTTPException(status_code=400, detail="model is required")
+    if not hasattr(app.state, "orchestrator"):
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized")
+
+    ic = app.state.orchestrator.ironclaw
+    return await ic.test_model(model, provider)
+
+
+@app.post("/api/openrouter-key")
+async def set_openrouter_key(request: Request):
+    """Set the OpenRouter API key at runtime (not persisted to .env)."""
+    body = await request.json()
+    api_key = body.get("api_key", "")
+
+    if not api_key:
+        raise HTTPException(status_code=400, detail="api_key is required")
+    if not hasattr(app.state, "orchestrator"):
+        raise HTTPException(status_code=503, detail="Orchestrator not initialized")
+
+    ic = app.state.orchestrator.ironclaw
+    ic._openrouter_api_key = api_key
+    _persist_log("INFO", "model-config", "OpenRouter API key updated at runtime", "")
+    return {"ok": True, "openrouter_configured": True}
+
+
+# ─── Agent Logs API ─────────────────────────────────────────────────────────
+
+
+@app.get("/api/logs")
+async def api_logs(
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
+    search: str = Query(default=""),
+    level: str = Query(default=""),
+    source: str = Query(default=""),
+):
+    """Return searchable, filterable agent logs."""
+    session = get_session()
+    try:
+        query = session.query(AgentLog)
+        if search:
+            pattern = f"%{search}%"
+            query = query.filter(
+                AgentLog.message.ilike(pattern) | AgentLog.detail.ilike(pattern)
+            )
+        if level:
+            query = query.filter(AgentLog.level == level.upper())
+        if source:
+            query = query.filter(AgentLog.source == source)
+        total = query.count()
+        rows = query.order_by(AgentLog.created_at.desc()).offset(offset).limit(limit).all()
+        logs = [
+            {
+                "id": r.id,
+                "level": r.level,
+                "source": r.source,
+                "message": r.message,
+                "detail": r.detail,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+        return {"logs": logs, "total": total}
+    finally:
+        session.close()
+
+
+def _persist_log(level: str, source: str, message: str, detail: str = "") -> None:
+    """Write a structured log entry to the database."""
+    try:
+        session = get_session()
+        try:
+            session.add(AgentLog(level=level, source=source, message=message, detail=detail))
+            session.commit()
+        finally:
+            session.close()
+    except Exception:
+        logger.warning("Could not persist agent log: %s", message)

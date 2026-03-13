@@ -162,7 +162,7 @@ class TestDatabaseTablesExist:
         from database.models import Base, get_engine
         engine = get_engine()
         table_names = set(Base.metadata.tables.keys())
-        expected = {"events", "workflow_runs", "tool_outputs", "agent_memory", "agent_conversations"}
+        expected = {"events", "workflow_runs", "tool_outputs", "agent_memory", "agent_conversations", "agent_logs"}
         assert expected.issubset(table_names)
 
 

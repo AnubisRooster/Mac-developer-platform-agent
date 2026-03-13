@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import StatusCard from "@/components/StatusCard";
+import ModelSelector from "@/components/ModelSelector";
 import { api, SystemStatus } from "@/lib/api";
 
 export default function StatusPage() {
@@ -60,6 +61,13 @@ export default function StatusPage() {
             error={status.database.error}
           />
         </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xs uppercase tracking-widest text-gray-500 mb-3">
+          AI Model
+        </h2>
+        <ModelSelector />
       </section>
 
       <section>

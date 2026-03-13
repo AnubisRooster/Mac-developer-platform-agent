@@ -62,6 +62,46 @@ export interface ConversationItem {
   created_at: string;
 }
 
+export interface ModelConfig {
+  current_provider: string;
+  current_model: string;
+  ollama_models: string[];
+  openrouter_models: string[];
+  openrouter_configured: boolean;
+}
+
+export interface ModelTestResult {
+  ok: boolean;
+  model: string;
+  provider: string;
+  response?: string;
+  error?: string;
+}
+
+export interface LogItem {
+  id: number;
+  level: string;
+  source: string;
+  message: string;
+  detail: string;
+  created_at: string;
+}
+
+async function postJSON<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const url = new URL(path, API_BASE);
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `API ${res.status}: ${res.statusText}`);
+  }
+  return res.json();
+}
+
 export const api = {
   getStatus: () => fetchJSON<SystemStatus>("/api/status"),
 
@@ -86,4 +126,29 @@ export const api = {
       "/api/agent-conversations",
       { limit: String(limit), offset: String(offset) }
     ),
+
+  getModelConfig: () => fetchJSON<ModelConfig>("/api/model-config"),
+
+  setModelConfig: (model: string, provider: string) =>
+    postJSON<{ ok: boolean; provider: string; model: string }>(
+      "/api/model-config",
+      { model, provider }
+    ),
+
+  testModel: (model: string, provider: string) =>
+    postJSON<ModelTestResult>("/api/model-config/test", { model, provider }),
+
+  setOpenRouterKey: (api_key: string) =>
+    postJSON<{ ok: boolean }>("/api/openrouter-key", { api_key }),
+
+  getLogs: (limit = 100, offset = 0, search = "", level = "", source = "") => {
+    const params: Record<string, string> = {
+      limit: String(limit),
+      offset: String(offset),
+    };
+    if (search) params.search = search;
+    if (level) params.level = level;
+    if (source) params.source = source;
+    return fetchJSON<{ logs: LogItem[]; total: number }>("/api/logs", params);
+  },
 };

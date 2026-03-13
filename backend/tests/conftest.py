@@ -42,6 +42,10 @@ os.environ.update(
         "GMAIL_TOKEN_FILE": "token.json",
         "WEBHOOK_HOST": "0.0.0.0",
         "WEBHOOK_PORT": "8080",
+        "IRONCLAW_MODEL": "qwen3.5:latest",
+        "OPENROUTER_API_KEY": "",
+        "OPENROUTER_MODEL": "openai/gpt-4o-mini",
+        "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
     }
 )
 

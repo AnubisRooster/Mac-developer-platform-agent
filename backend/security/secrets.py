@@ -34,6 +34,12 @@ class AppSecrets(BaseSettings):
     # IronClaw Runtime
     ironclaw_url: str = "http://localhost:9090"
     ironclaw_auth_token: str = ""
+    ironclaw_model: str = "qwen3.5:latest"
+
+    # OpenRouter (cloud fallback)
+    openrouter_api_key: str = ""
+    openrouter_model: str = "openai/gpt-4o-mini"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     # Slack
     slack_bot_token: str = ""

@@ -85,6 +85,19 @@ class AgentConversation(Base):
     )
 
 
+class AgentLog(Base):
+    __tablename__ = "agent_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    level: Mapped[str] = mapped_column(String(20), index=True, default="INFO")
+    source: Mapped[str] = mapped_column(String(255), index=True, default="")
+    message: Mapped[str] = mapped_column(Text, default="")
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+
+
 _engine = None
 _SessionLocal = None
 
