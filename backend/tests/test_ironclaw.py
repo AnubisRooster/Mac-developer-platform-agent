@@ -85,12 +85,41 @@ class TestIronClawClient:
             assert result.type == "action_plan"
             assert len(result.actions) == 1
             assert result.actions[0].tool == "slack.send_message"
+            assert result.actions[0].args["channel"] == "#test"
+
+    @pytest.mark.asyncio
+    async def test_interpret_passes_tools_as_openai_format(self):
+        client = IronClawClient()
+
+        mock_resp = _mock_response(200, {
+            "id": "chatcmpl-test",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}],
+        })
+
+        with patch("agent.ironclaw.httpx.AsyncClient") as mock_cls:
+            mock_instance = AsyncMock()
+            mock_instance.post.return_value = mock_resp
+            mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
+            mock_instance.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_instance
+
+            tools = [{"name": "test.tool", "description": "A test tool", "parameters": {"type": "object"}}]
+            await client.interpret(message="test", tools=tools)
+
+            call_args = mock_instance.post.call_args
+            payload = call_args.kwargs.get("json") or call_args[1].get("json")
+            assert "tools" in payload
+            assert payload["tools"][0]["type"] == "function"
+            assert payload["tools"][0]["function"]["name"] == "test.tool"
 
     @pytest.mark.asyncio
     async def test_summarize(self):
         client = IronClawClient()
 
-        mock_resp = _mock_response(200, {"summary": "This is a summary."})
+        mock_resp = _mock_response(200, {
+            "id": "chatcmpl-test",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "This is a summary."}, "finish_reason": "stop"}],
+        })
 
         with patch("agent.ironclaw.httpx.AsyncClient") as mock_cls:
             mock_instance = AsyncMock()
@@ -106,7 +135,10 @@ class TestIronClawClient:
     async def test_health_success(self):
         client = IronClawClient()
 
-        mock_resp = _mock_get_response(200, {"status": "healthy"})
+        mock_resp = _mock_get_response(200, {
+            "data": [{"id": "qwen3.5:latest", "object": "model", "created": 0, "owned_by": "ironclaw"}],
+            "object": "list",
+        })
 
         with patch("agent.ironclaw.httpx.AsyncClient") as mock_cls:
             mock_instance = AsyncMock()
@@ -116,7 +148,8 @@ class TestIronClawClient:
             mock_cls.return_value = mock_instance
 
             result = await client.health()
-            assert result["status"] == "healthy"
+            assert result["status"] == "connected"
+            assert "qwen3.5:latest" in result["models"]
 
     @pytest.mark.asyncio
     async def test_health_failure(self):
@@ -132,3 +165,26 @@ class TestIronClawClient:
             result = await client.health()
             assert result["status"] == "unreachable"
             assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_auth_header_sent(self):
+        client = IronClawClient()
+        client._auth_token = "test-token"
+
+        mock_resp = _mock_response(200, {
+            "id": "chatcmpl-test",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}],
+        })
+
+        with patch("agent.ironclaw.httpx.AsyncClient") as mock_cls:
+            mock_instance = AsyncMock()
+            mock_instance.post.return_value = mock_resp
+            mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
+            mock_instance.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_instance
+
+            await client.interpret(message="test", tools=[])
+
+            call_args = mock_instance.post.call_args
+            headers = call_args.kwargs.get("headers") or call_args[1].get("headers")
+            assert headers["Authorization"] == "Bearer test-token"

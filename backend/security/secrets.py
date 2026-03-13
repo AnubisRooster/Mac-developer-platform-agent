@@ -33,6 +33,7 @@ class AppSecrets(BaseSettings):
 
     # IronClaw Runtime
     ironclaw_url: str = "http://localhost:9090"
+    ironclaw_auth_token: str = ""
 
     # Slack
     slack_bot_token: str = ""

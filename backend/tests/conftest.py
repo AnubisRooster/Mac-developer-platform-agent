@@ -95,18 +95,52 @@ def db_session():
 
 @pytest.fixture()
 def mock_ironclaw_response():
-    """Factory for IronClaw response dicts."""
+    """Factory for IronClaw OpenAI-compatible response dicts."""
 
     def _make(
         response_type="response",
         response_text="Here is the result.",
         actions=None,
     ):
+        import json as _json
+
+        if response_type == "action_plan" and actions:
+            tool_calls = [
+                {
+                    "id": f"call_{i}",
+                    "type": "function",
+                    "function": {
+                        "name": a["tool"],
+                        "arguments": _json.dumps(a.get("args", {})),
+                    },
+                }
+                for i, a in enumerate(actions)
+            ]
+            return {
+                "id": "chatcmpl-test",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": tool_calls,
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+            }
         return {
-            "type": response_type,
-            "response": response_text,
-            "actions": actions or [],
-            "conversation_id": "test-conv-1",
+            "id": "chatcmpl-test",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": response_text,
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
         }
 
     return _make

@@ -48,6 +48,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+async def _ensure_database_tables():
+    """Guarantee all tables exist before the first request is served."""
+    from database.models import get_engine
+
+    get_engine()
+    logger.info("Database tables verified")
+
+
 # ─── Health ──────────────────────────────────────────────────────────────────
 
 
@@ -181,9 +191,15 @@ async def api_status():
     secrets = get_secrets()
 
     # IronClaw health
-    ironclaw_status: Dict[str, Any] = {"status": "unknown"}
+    ironclaw_status: Dict[str, Any] = {"status": "not_configured"}
     if hasattr(app.state, "orchestrator"):
-        ironclaw_status = await app.state.orchestrator.ironclaw.health()
+        try:
+            ironclaw_status = await app.state.orchestrator.ironclaw.health()
+        except Exception as e:
+            ironclaw_status = {
+                "status": "unreachable",
+                "error": f"IronClaw runtime not running on {get_secrets().ironclaw_url} — start it to enable AI features",
+            }
 
     # Database health
     db_status: Dict[str, Any] = {"status": "unknown"}
