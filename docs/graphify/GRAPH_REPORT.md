@@ -1,12 +1,12 @@
-# Graph Report - Mac-developer-platform-agent  (2026-10-12)
+# Graph Report - Mac-developer-platform-agent  (2026-10-19)
 
 ## Corpus Check
-- 121 files · ~228,505 words
+- 121 files · ~143,299 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 8 file(s) not represented in the graph (top: (none) 4, .ini 2, .example 1)
 
 ## Summary
-- 1309 nodes · 2715 edges · 96 communities (34 shown, 62 thin omitted)
+- 1309 nodes · 2718 edges · 96 communities (34 shown, 62 thin omitted)
 - Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 257 edges (avg confidence: 0.91)
 - Token cost: 0 input · 0 output
 
@@ -242,7 +242,7 @@ Nodes (3): AgentConversation, TestAgentConversationModel, TestDashboardAPIConver
 
 ## Knowledge Gaps
 - **7 isolated node(s):** `react-dom`, `@types/node`, `@types/react`, `@types/react-dom`, `autoprefixer` (+2 more)
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 449 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 448 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **62 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -255,7 +255,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **What connects `react-dom`, `@types/node`, `@types/react` to the rest of the system?**
   _7 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `IronClawClient` be split into smaller, more focused modules?**
-  _Cohesion score 0.050721954831543875 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0518326545723806 - nodes in this community are weakly interconnected._
 - **Why does `Orchestrator` connect `Orchestrator` to `backend/main.py`, `WorkflowEngine`, `main.py`, `LLMClient`, `test_agent.py`, `security/secrets.py`, `asyncio`, `Planner`, `get_session()`, `ConversationMemory`, `Any`, `asyncio`?**
   _High betweenness centrality (0.064) - this node is a cross-community bridge._
 - **Are the 22 inferred relationships involving `AgentEvent` (e.g. with `SlackCommandGateway` and `EventBus`) actually correct?**
